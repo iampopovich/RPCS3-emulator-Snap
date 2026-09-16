@@ -83,4 +83,4 @@ jobs:
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
-          snapcraft release rpcs3-fresh edge stable
+          snapcraft promote rpcs3-fresh --from-channel=edge --to-channel=stable --yes
