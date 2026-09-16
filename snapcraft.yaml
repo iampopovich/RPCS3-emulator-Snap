@@ -1,4 +1,4 @@
-name: rpcs3-emulator
+name: rpcs3-fresh
 base: core24
 adopt-info: rpcs3-app
 platforms:
