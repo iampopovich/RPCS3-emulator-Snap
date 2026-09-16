@@ -8,7 +8,7 @@ platforms:
   arm64:
     build-on: [arm64]
     build-for: [arm64]
-summary: Open-source Sony PlayStation 3 Emulator
+summary: Daily builds for open-source Sony PlayStation 3 Emulator
 description: |
   RPCS3 is an experimental open-source Sony PlayStation 3 emulator and debugger written in C++ for Windows and Linux.
   RPCS3 started development in May of 2011 by its founders DH and Hykem.
