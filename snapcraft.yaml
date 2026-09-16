@@ -65,7 +65,7 @@ parts:
       ./"$APPIMAGE_FILE" --appimage-extract
       mv -f AppDir/usr $CRAFT_PART_INSTALL/usr
 
-      sed -i 's|Name=RPCS3|Name=RPCS3 [Kyu]|' $CRAFT_PART_INSTALL/usr/share/applications/rpcs3.desktop
+      sed -i 's|Name=RPCS3|Name=RPCS3 Fresh|' $CRAFT_PART_INSTALL/usr/share/applications/rpcs3.desktop
 
       VERSION=$(echo "$APPIMAGE_FILE" | sed -n 's/.*rpcs3-v\([0-9.]*\)-\([0-9]*\)-.*/\1-\2/p')
       craftctl set version="$VERSION"
