@@ -1,0 +1,86 @@
+name: Build and publish snap
+
+on:
+  schedule:
+    # Every 6 hours - RPCS3 upstream ships builds very frequently
+    - cron: '0 */6 * * *'
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - snapcraft.yaml
+      - command-chain/**
+      - .github/workflows/build-and-publish.yml
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.check.outputs.new_version }}
+      upstream_tag: ${{ steps.check.outputs.upstream_tag }}
+    steps:
+      - name: Compare upstream release with published snap
+        id: check
+        run: |
+          set -euo pipefail
+          UPSTREAM_TAG=$(curl -s "https://api.github.com/repos/RPCS3/rpcs3-binaries-linux/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4)
+          echo "Upstream tag: $UPSTREAM_TAG"
+
+          # Latest version already published to the stable channel of our snap
+          PUBLISHED_VERSION=$(curl -s "https://api.snapcraft.io/v2/snaps/info/rpcs3-fresh" \
+            -H "Snap-Device-Series: 16" | \
+            python3 -c "import json,sys; d=json.load(sys.stdin); ch=[c for c in d.get('channel-map',[]) if c['channel']['name']=='stable']; print(ch[0]['version'] if ch else '')" || true)
+          echo "Published version: $PUBLISHED_VERSION"
+
+          if [ "$UPSTREAM_TAG" != "$PUBLISHED_VERSION" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event_name }}" = "push" ]; then
+            echo "new_version=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "new_version=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "upstream_tag=$UPSTREAM_TAG" >> "$GITHUB_OUTPUT"
+
+  build-and-publish:
+    needs: check-upstream
+    if: needs.check-upstream.outputs.new_version == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
+
+      - name: Build snap (${{ matrix.arch }})
+        uses: snapcore/action-build@v1
+        id: build
+        with:
+          path: .
+        env:
+          SNAPCRAFT_BUILD_ENVIRONMENT: lxd
+          SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY: 4G
+
+      - name: Publish to edge first
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: edge
+
+  promote-to-stable:
+    needs: [check-upstream, build-and-publish]
+    if: needs.check-upstream.outputs.new_version == 'true'
+    runs-on: ubuntu-latest
+    # Give edge a little soak time before promoting; adjust/remove if you want
+    # instant stable releases instead of an edge -> stable gate.
+    steps:
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
+
+      - name: Promote edge to stable
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run: |
+          snapcraft release rpcs3-fresh edge stable
